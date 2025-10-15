@@ -17,7 +17,7 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Hidden Google key (in .env), not shown to users
+// Hidden Google key (from .env), not shown to users
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as
   | string
   | undefined;
@@ -91,25 +91,18 @@ export default function App() {
    Shell + tabs
    ================================ */
 function AppShell() {
-  const location = useLocation();
   return (
     <div>
       <header style={header}>
         <nav style={tabs}>
-          <NavLink to="/home" style={link} className={({ isActive }) => (isActive ? "active" : "")} title="Home">
+          <NavLink to="/home" style={link} title="Home">
             <span style={iconBox}>🏠</span>
           </NavLink>
-          <NavLink to="/loops" style={link} className={({ isActive }) => (isActive ? "active" : "")}>
-            Loops
-          </NavLink>
-          <NavLink to="/expenses" style={link} className={({ isActive }) => (isActive ? "active" : "")}>
-            Expenses
-          </NavLink>
-          <NavLink to="/tips" style={link} className={({ isActive }) => (isActive ? "active" : "")}>
-            Tips
-          </NavLink>
+          <NavLink to="/loops" style={link}>Loops</NavLink>
+          <NavLink to="/expenses" style={link}>Expenses</NavLink>
+          <NavLink to="/tips" style={link}>Tips</NavLink>
           <div style={{ flex: 1 }} />
-          <NavLink to="/settings" style={link} className={({ isActive }) => (isActive ? "active" : "")} title="Settings">
+          <NavLink to="/settings" style={link} title="Settings">
             <span style={iconBox}>⚙️</span>
           </NavLink>
         </nav>
@@ -131,82 +124,101 @@ function AppShell() {
 }
 
 /* ================================
-   Sign in / up / magic link
+   Sign in / Sign up (password only)
    ================================ */
 function SignInCard() {
-  const [mode, setMode] = useState<"signin" | "signup" | "magic">("signin");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
+  // If you ever re-enable confirmations, this is where the link would send them back.
   const redirectTo = import.meta.env.DEV
-    ? "http://localhost:5173/"
-    : "https://msberryman.github.io/loop-ledger/";
+    ? "http://localhost:5173/#/home"
+    : "https://msberryman.github.io/loop-ledger/#/home";
 
-  const onSignIn = async () => {
-    if (!email || !password) return alert("Enter email and password");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) alert(error.message);
-  };
-
-  const onSignUp = async () => {
-    if (!email || !password) return alert("Enter email and password");
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: redirectTo },
-    });
-    if (error) {
-      alert(error.message);
+  const onSubmit = async () => {
+    setErr(null);
+    if (!email || !password) {
+      setErr("Enter an email and password.");
       return;
     }
-    const newId = data.user?.id;
-    if (newId) {
-      try {
-        await supabase.from("profiles").insert({ user_id: newId }).select().single();
-      } catch (e) {
-        console.warn("profiles insert (signup) note:", e);
+    setLoading(true);
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: redirectTo },
+        });
+        if (error) throw error;
+
+        // If email confirmations are disabled (as I suggested), data.session will exist and you’re signed in immediately.
+        // If confirmations are ON, no session yet; we surface a friendly message.
+        if (!data.session) {
+          setErr("Check your inbox to confirm your email, then come back here to sign in.");
+        }
       }
+    } catch (e: any) {
+      setErr(e?.message ?? "Something went wrong.");
+    } finally {
+      setLoading(false);
     }
-    alert("Check your email to confirm your account.");
   };
-
-  const sendMagic = async () => {
-    if (!email) return alert("Enter your email");
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo },
-    });
-    if (error) alert(error.message);
-    else alert("Magic link sent");
-  };
-
-  const isPwd = mode === "signin" || mode === "signup";
 
   return (
     <div style={{ ...page }}>
       <div style={{ ...card, maxWidth: 420 }}>
-        <h2 style={{ margin: 0, marginBottom: 6 }}>Loop Ledger</h2>
+        <h2 style={{ margin: 0, marginBottom: 12 }}>Loop Ledger</h2>
+
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-          <button style={{ ...btn, fontWeight: mode === "signin" ? 700 : 600 }} onClick={() => setMode("signin")}>
+          <button
+            style={{ ...btn, background: mode === "signin" ? "#111" : "#555" }}
+            onClick={() => setMode("signin")}
+          >
             Sign in
           </button>
-          <button style={{ ...btn, fontWeight: mode === "signup" ? 700 : 600 }} onClick={() => setMode("signup")}>
+          <button
+            style={{ ...btn, background: mode === "signup" ? "#111" : "#555" }}
+            onClick={() => setMode("signup")}
+          >
             Sign up
-          </button>
-          <button style={{ ...btn, fontWeight: mode === "magic" ? 700 : 600 }} onClick={() => setMode("magic")}>
-            Magic link
           </button>
         </div>
 
+        {err && (
+          <div style={{ background: "#ffe8e6", border: "1px solid #ffb3ab", color: "#a40000", padding: 10, borderRadius: 8, marginBottom: 10 }}>
+            {err}
+          </div>
+        )}
+
         <div style={{ display: "grid", gap: 8 }}>
-          <input style={input} type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-          {isPwd && (
-            <input style={input} type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          )}
-          {mode === "signin" && <button style={btn} onClick={onSignIn}>Sign in</button>}
-          {mode === "signup" && <button style={btn} onClick={onSignUp}>Create account</button>}
-          {mode === "magic" && <button style={btn} onClick={sendMagic}>Send magic link</button>}
-          <div style={smallNote}>Password sign-in works immediately. Sign-up / magic link may require email confirmation.</div>
+          <input
+            style={input}
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+          />
+          <input
+            style={input}
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={mode === "signin" ? "current-password" : "new-password"}
+          />
+          <button style={btn} onClick={onSubmit} disabled={loading}>
+            {loading ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+          </button>
+          <div style={smallNote}>
+            Password sign-in works immediately. If your project requires email confirmation, you’ll get an email first.
+          </div>
         </div>
       </div>
     </div>
@@ -553,9 +565,7 @@ function SettingsPage() {
               value={settings.homeAddress}
               onChange={(e) => setSettings((s) => ({ ...s, homeAddress: e.target.value }))}
             />
-            <div style={smallNote}>
-              Used to auto-calc miles to courses. (API key is hidden in app config.)
-            </div>
+            <div style={smallNote}>Used to auto-calc miles to courses. (API key is hidden in app config.)</div>
           </div>
 
           <div>
@@ -616,7 +626,7 @@ const list: React.CSSProperties = { margin: 0, padding: 0, listStyle: "none", di
 const row: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", border: "1px solid #eee", borderRadius: 10, padding: 10 };
 
 /* ================================
-   Utils  ← these were missing on your build
+   Utils
    ================================ */
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
