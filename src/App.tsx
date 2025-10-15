@@ -9,6 +9,14 @@ import {
   useLocation,
 } from "react-router-dom";
 
+/* global google */
+declare global {
+  interface Window {
+    google?: typeof google;
+  }
+}
+
+
 /* ================= Helpers & storage ================= */
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 const today = () => {
