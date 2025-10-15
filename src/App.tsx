@@ -11,9 +11,19 @@ import {
 import { createClient } from "@supabase/supabase-js";
 
 /* ---------------- Supabase client ---------------- */
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
-const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
-export const supabase = createClient(supabaseUrl, supabaseAnon);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+// guard (won’t break the app, but logs in dev)
+if (!supabaseUrl || !supabaseAnon) {
+  console.error("Missing Supabase env vars. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
+}
+export const supabase = createClient(
+  supabaseUrl ?? "http://invalid",
+  supabaseAnon ?? "invalid"
+);
+
+/* ---------------- Google Maps key from env (HIDDEN from users) ---------------- */
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
 /* ---------------- Google Maps ambient types (TS-safe shim) ---------------- */
 declare global {
@@ -67,7 +77,7 @@ type Settings = {
   homeAddress: string;
   homeLat?: number;
   homeLng?: number;
-  googleApiKey?: string;
+  // NOTE: googleApiKey REMOVED from user settings — we use env instead
 };
 
 const loopsBox = box("loops");
@@ -81,7 +91,6 @@ const defaultSettings: Settings = {
   homeAddress: "",
   homeLat: undefined,
   homeLng: undefined,
-  googleApiKey: "",
 };
 
 /* ================= Tiny toast ================= */
@@ -250,11 +259,11 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
   return R * 2 * Math.asin(Math.sqrt(s));
 }
 
-/** Load Google Maps JS (Places) once (return `any` so TS won't choke in CI) */
-async function loadGoogle(apiKey?: string): Promise<any | undefined> {
+/** Load Google Maps JS (Places) once using env key */
+async function loadGoogleFromEnv(): Promise<any | undefined> {
   if (typeof window === "undefined") return;
   if ((window as any).google?.maps?.places) return (window as any).google;
-  if (!apiKey) return undefined; // no key, skip
+  if (!GOOGLE_MAPS_API_KEY) return undefined; // no key configured, skip
   if (document.getElementById("ggl-maps-js")) {
     await new Promise((r) => setTimeout(r, 800));
     return (window as any).google;
@@ -263,7 +272,7 @@ async function loadGoogle(apiKey?: string): Promise<any | undefined> {
   s.id = "ggl-maps-js";
   s.async = true;
   s.defer = true;
-  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(GOOGLE_MAPS_API_KEY)}&libraries=places`;
   document.head.appendChild(s);
   await new Promise((r) => (s.onload = () => r(null)));
   return (window as any).google;
@@ -271,27 +280,61 @@ async function loadGoogle(apiKey?: string): Promise<any | undefined> {
 
 /* ================= Auth Gate (Phase A) ================= */
 function SignInCard() {
+  const [mode, setMode] = useState<"signin" | "signup" | "magic">("signin");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const sendLink = async () => {
-    if (!email.trim()) return alert("Enter your email");
-    // Use site origin for redirect (works for GitHub Pages + localhost)
-    const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
+  const redirectTo = import.meta.env.DEV
+    ? "http://localhost:5173/"
+    : "https://msberryman.github.io/loop-ledger/";
+
+  const onSignIn = async () => {
+    if (!email || !password) return alert("Enter email and password");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) alert(error.message);
+  };
+
+  const onSignUp = async () => {
+    if (!email || !password) return alert("Enter email and password");
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
       options: { emailRedirectTo: redirectTo },
     });
     if (error) {
       alert(error.message);
     } else {
-      toast("Check your email for the login link");
+      toast("Check your email to confirm");
     }
   };
+
+  const sendMagic = async () => {
+    if (!email) return alert("Enter your email");
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo },
+    });
+    if (error) alert(error.message);
+    else toast("Magic link sent");
+  };
+
+  const isPwd = mode === "signin" || mode === "signup";
 
   return (
     <div style={{ ...container, paddingTop: 48 }}>
       <div style={{ ...card, maxWidth: 420, margin: "0 auto" }}>
-        <h2>Sign in</h2>
+        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+          <button style={{ ...btn, fontWeight: mode === "signin" ? 700 : 600 }} onClick={() => setMode("signin")}>
+            Sign in
+          </button>
+          <button style={{ ...btn, fontWeight: mode === "signup" ? 700 : 600 }} onClick={() => setMode("signup")}>
+            Sign up
+          </button>
+          <button style={{ ...btn, fontWeight: mode === "magic" ? 700 : 600 }} onClick={() => setMode("magic")}>
+            Magic link
+          </button>
+        </div>
+
         <div style={{ display: "grid", gap: 8 }}>
           <input
             style={input}
@@ -300,9 +343,29 @@ function SignInCard() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <button style={btn} onClick={sendLink}>Send magic link</button>
+          {isPwd && (
+            <input
+              style={input}
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          )}
+
+          {mode === "signin" && (
+            <button style={btn} onClick={onSignIn}>Sign in</button>
+          )}
+          {mode === "signup" && (
+            <button style={btn} onClick={onSignUp}>Create account</button>
+          )}
+          {mode === "magic" && (
+            <button style={btn} onClick={sendMagic}>Send magic link</button>
+          )}
+
           <div style={smallNote}>
-            You’ll receive a one-time link to sign in. Keep this page open; it will detect the session when you return.
+            • Password sign-in works immediately.  
+            • Magic link / sign up may require email confirmation (check your inbox).
           </div>
         </div>
       </div>
@@ -341,7 +404,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 /* ================= Pages ================= */
-// Home: minimal totals only (no hero title or description)
+// Home: minimal totals
 function Home() {
   const loops = loopsBox.get<Loop[]>([]);
   const expenses = expensesBox.get<Expense[]>([]);
@@ -386,11 +449,11 @@ function Loops() {
   // Persist loops
   useEffect(() => { loopsBox.set(loops); }, [loops]);
 
-  // Initialize Google Autocomplete on the course input (if API key exists)
+  // Initialize Google Autocomplete on the course input using ENV key
   useEffect(() => {
     let ac: any | undefined;
     (async () => {
-      const g = await loadGoogle(settings.googleApiKey);
+      const g = await loadGoogleFromEnv();
       if (!g || !courseRef.current) return;
       ac = new g.maps.places.Autocomplete(courseRef.current as HTMLInputElement, {
         fields: ["name", "geometry"],
@@ -407,7 +470,7 @@ function Loops() {
       });
     })();
     return () => {};
-  }, [settings.googleApiKey]);
+  }, []); // env key is fixed; no need to depend
 
   // Auto-calc miles when home + course have coords
   useEffect(() => {
@@ -471,7 +534,6 @@ function Loops() {
     setBagFee("0");
     setPreGrat("0");
     setTip("0");
-    // keep date/times as-is
   };
 
   const del = (id: string) => {
@@ -515,12 +577,12 @@ function Loops() {
             <input
               ref={courseRef}
               style={input}
-              placeholder="Course (Google autocomplete if API key set)"
+              placeholder="Course (Google autocomplete)"
               value={course}
               onChange={(e) => setCourse(e.target.value)}
             />
             <div style={smallNote}>
-              Start typing a golf course. With a Google Maps API key in Settings, this auto-completes and we auto-calculate miles from your Home Address.
+              Start typing a golf course. We’ll auto-calc miles from your Home Address.
             </div>
           </div>
 
@@ -709,11 +771,11 @@ function SettingsPage() {
     setSettings((s) => ({ ...s, [k]: n } as Settings));
   };
 
-  // Home address Google Autocomplete (optional)
+  // Home address Google Autocomplete (uses ENV key)
   const homeRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     (async () => {
-      const g = await loadGoogle(settings.googleApiKey);
+      const g = await loadGoogleFromEnv();
       if (!g || !homeRef.current) return;
       const ac = new g.maps.places.Autocomplete(homeRef.current as HTMLInputElement, {
         fields: ["formatted_address", "geometry"],
@@ -727,7 +789,7 @@ function SettingsPage() {
         setSettings((s) => ({ ...s, homeAddress: addr, homeLat: lat, homeLng: lng }));
       });
     })();
-  }, [settings.googleApiKey]);
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -744,24 +806,12 @@ function SettingsPage() {
             <input
               ref={homeRef}
               style={input}
-              placeholder="Home Address (autocomplete if API key set)"
+              placeholder="Home Address (Google autocomplete)"
               value={settings.homeAddress}
               onChange={(e) => setSettings((s) => ({ ...s, homeAddress: e.target.value }))}
             />
             <div style={smallNote}>
               Used to auto-calculate miles to the selected course. Pick from Google to save exact coordinates.
-            </div>
-          </div>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
-            <input
-              style={input}
-              placeholder="Google Maps API Key (optional)"
-              value={settings.googleApiKey || ""}
-              onChange={(e) => setSettings((s) => ({ ...s, googleApiKey: e.target.value.trim() }))}
-            />
-            <div style={smallNote}>
-              Enables course & address autocomplete and auto-miles. Leave blank to enter manually.
             </div>
           </div>
         </div>
@@ -892,3 +942,4 @@ function resetAll() {
   localStorage.removeItem("settings");
   location.reload();
 }
+
