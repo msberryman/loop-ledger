@@ -1,0 +1,77 @@
+/* --- quick preview styling --- */
+:root {
+  --bg: #0b1220;
+  --panel: #111827;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+  --accent: #ef4444;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+.preview-shell {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #0b1220, #0e1426);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.preview-header {
+  padding: 16px 20px;
+  font-weight: 700;
+  opacity: .75;
+}
+
+.ui-nav {
+  display: flex;
+  gap: 12px;
+  padding: 0 20px 16px;
+  color: var(--muted);
+}
+
+.ui-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+}
+
+.ui-nav a.active {
+  color: var(--text);
+  background: #1f2937;
+}
+
+.screen {
+  max-width: 920px;
+  margin: 32px auto;
+  padding: 24px;
+}
+
+h2 {
+  font-size: 28px;
+  margin: 0 0 12px;
+}
+
+.timer {
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin: 16px 0 24px;
+}
+
+.big-button {
+  padding: 12px 16px;
+  background: #111;
+  color: var(--text);
+  border: 1px solid #333;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.big-button.red {
+  background: var(--accent);
+  border-color: #b91c1c;
+}

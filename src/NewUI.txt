@@ -1,0 +1,38 @@
+import React from "react";
+import { Routes, Route, NavLink } from "react-router-dom";
+
+// Import Kelsey's screens
+import Home from "./ui/Home";
+import ActiveLoop from "./ui/ActiveLoop";
+import History from "./ui/History";
+
+// Import the styles
+import "./ui/new-ui.css";
+
+export default function NewUI() {
+  return (
+    <div className="newui">
+      {/* Simple top nav just for the /ui area */}
+      <nav className="newui-nav">
+        <NavLink end to="" className={({ isActive }) => isActive ? "active" : ""}>
+          Home
+        </NavLink>
+        <NavLink to="active" className={({ isActive }) => isActive ? "active" : ""}>
+          Active Loop
+        </NavLink>
+        <NavLink to="history" className={({ isActive }) => isActive ? "active" : ""}>
+          History
+        </NavLink>
+      </nav>
+
+      {/* Nested routes under /ui */}
+      <div className="newui-body">
+        <Routes>
+          <Route index element={<Home />} />
+          <Route path="active" element={<ActiveLoop />} />
+          <Route path="history" element={<History />} />
+        </Routes>
+      </div>
+    </div>
+  );
+}

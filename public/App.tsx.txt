@@ -1052,6 +1052,7 @@ const tipMixPrePct     = tipsMonth ? (preGratMonth    / tipsMonth) * 100 : 0; //
 }
 
 /* ---------- Routes ---------- */
+import NewUI from "./NewUI";
 export default function App() {
   return (
     <div>
@@ -1061,6 +1062,7 @@ export default function App() {
         <Route path="/expenses" element={<ExpensesScreen />} />
         <Route path="/money" element={<MoneyScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
+	<Route path="/ui/*" element={<NewUI />} />
       </Routes>
       <Tabs />
     </div>
