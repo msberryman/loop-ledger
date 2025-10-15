@@ -40,8 +40,6 @@ const loopsBox = box("loops");
 const expensesBox = box("expenses");
 const tipsBox = box("tips");
 const settingsBox = box("settings");
-
-/* Default settings */
 const defaultSettings: Settings = { mileageRate: 0.67, autoMileage: true };
 
 /* ================= Tiny toast ================= */
@@ -63,7 +61,7 @@ function ToastHost() {
     const sub = () => setTick((x) => x + 1);
     listeners.add(sub);
     return () => {
-      listeners.delete(sub); // return void (ok for TS)
+      listeners.delete(sub); // return void (TS-safe)
     };
   }, []);
   return (
@@ -72,15 +70,9 @@ function ToastHost() {
         <div
           key={t.id}
           style={{
-            marginTop: 8,
-            padding: "10px 14px",
-            borderRadius: 10,
-            border: "1px solid #ddd",
-            background: "#fff",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-            fontWeight: 600,
-            minWidth: 120,
-            textAlign: "center",
+            marginTop: 8, padding: "10px 14px", borderRadius: 10,
+            border: "1px solid #ddd", background: "#fff",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)", fontWeight: 600, minWidth: 120, textAlign: "center",
           }}
         >
           {t.msg}
@@ -95,14 +87,33 @@ const page: React.CSSProperties = { minHeight: "100vh", display: "flex", flexDir
 const container: React.CSSProperties = { width: "100%", maxWidth: 960, margin: "0 auto", padding: "0 16px" };
 const main: React.CSSProperties = { flex: 1, width: "100%", padding: "16px 0" };
 const tabsBar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 10, borderBottom: "1px solid #e5e5e5", background: "#ffffff" };
-const tabs: React.CSSProperties = { display: "flex", gap: 8, padding: 8, flexWrap: "wrap" };
-const tabBase: React.CSSProperties = { padding: "8px 12px", borderRadius: 8, textDecoration: "none", color: "inherit", border: "1px solid transparent", fontWeight: 500 };
 const tabActive: React.CSSProperties = { border: "1px solid #d0d0d0", fontWeight: 700, boxShadow: "0 1px 2px rgba(0,0,0,0.06)" };
 const card: React.CSSProperties = { border: "1px solid #eee", borderRadius: 12, padding: 12 };
 const row: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" };
 const btn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, background: "#fff", cursor: "pointer" };
 const input: React.CSSProperties = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8 };
 const smallNote: React.CSSProperties = { color: "#666", fontSize: 12 };
+
+/* ================= Tiny icons (inline SVG) ================= */
+function IconHome({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 10.5L12 3l9 7.5"></path>
+      <path d="M9 22V12h6v10"></path>
+      <path d="M3 10.5V22h18V10.5"></path>
+    </svg>
+  );
+}
+function IconGear({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
+      <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1A2 2 0 1 1 7.6 4l.1.1a1 1 0 0 0 1.1.2h.2A1 1 0 0 0 9.6 3V3a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9h.2a1 1 0 0 0 1.1-.2l.1-.1A2 2 0 1 1 20 7.6l-.1.1a1 1 0 0 0-.2 1.1v.2a1 1 0 0 0 .9.6H21a2 2 0 1 1 0 4h-.2a1 1 0 0 0-.9.6Z"></path>
+    </svg>
+  );
+}
 
 /* ================= Floating Home ================= */
 function HomeFab() {
@@ -113,16 +124,9 @@ function HomeFab() {
     <button
       onClick={() => navigate("/home")}
       style={{
-        position: "fixed",
-        right: 16,
-        bottom: 16,
-        padding: "10px 14px",
-        borderRadius: 999,
-        border: "1px solid #ddd",
-        background: "#fff",
-        boxShadow: "0 6px 24px rgba(0,0,0,0.12)",
-        cursor: "pointer",
-        fontWeight: 600,
+        position: "fixed", right: 16, bottom: 16, padding: "10px 14px",
+        borderRadius: 999, border: "1px solid #ddd", background: "#fff",
+        boxShadow: "0 6px 24px rgba(0,0,0,0.12)", cursor: "pointer", fontWeight: 600,
       }}
     >
       Home
@@ -130,22 +134,46 @@ function HomeFab() {
   );
 }
 
-/* ================= Nav tabs ================= */
+/* ================= Nav tabs (icons for Home + Settings) ================= */
 function NavTabs() {
   const links = [
-    { to: "/home", label: "Home" },
+    { to: "/home", label: "Home", icon: <IconHome /> },
     { to: "/loops", label: "Loops" },
     { to: "/expenses", label: "Expenses" },
     { to: "/tips", label: "Tips" },
-    { to: "/settings", label: "Settings" },
+    { to: "/settings", label: "Settings", icon: <IconGear /> },
   ];
+
+  const tightTabs: React.CSSProperties = { display: "flex", gap: 6, padding: 6, flexWrap: "nowrap", overflowX: "auto" };
+  const tightTabBase: React.CSSProperties = {
+    padding: "8px 10px",
+    borderRadius: 10,
+    textDecoration: "none",
+    color: "inherit",
+    border: "1px solid transparent",
+    fontWeight: 600,
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    whiteSpace: "nowrap",
+  };
+
   return (
     <div style={tabsBar}>
       <div style={container}>
-        <nav style={tabs}>
+        <nav style={tightTabs}>
           {links.map((l) => (
-            <NavLink key={l.to} to={l.to} style={({ isActive }) => ({ ...tabBase, ...(isActive ? tabActive : {}) })}>
-              {l.label}
+            <NavLink
+              key={l.to}
+              to={l.to}
+              aria-label={l.label}
+              title={l.label}
+              style={({ isActive }) => ({
+                ...tightTabBase,
+                ...(isActive ? tabActive : {}),
+              })}
+            >
+              {l.icon ?? l.label}
             </NavLink>
           ))}
         </nav>
@@ -157,7 +185,6 @@ function NavTabs() {
 /* ================= Pages ================= */
 function Home() {
   const navigate = useNavigate();
-  // simple dashboard totals
   const loops = loopsBox.get<Loop[]>([]);
   const expenses = expensesBox.get<Expense[]>([]);
   const tips = tipsBox.get<Tip[]>([]);
@@ -193,23 +220,19 @@ function Loops() {
   const [rate, setRate] = useState("110");
   const [tip, setTip] = useState("60");
   const [miles, setMiles] = useState("10");
-
   const settings = settingsBox.get<Settings>(defaultSettings);
 
   useEffect(() => { loopsBox.set(loops); }, [loops]);
 
   const add = () => {
     if (!course.trim()) return alert("Course required");
-    const nRate = Number(rate);
-    const nTip = Number(tip);
-    const nMiles = Number(miles);
+    const nRate = Number(rate), nTip = Number(tip), nMiles = Number(miles);
     if ([nRate, nTip, nMiles].some(isNaN)) return alert("Rate/Tip/Miles must be numbers");
 
     const newLoop: Loop = { id: makeId(), date, course: course.trim(), rate: nRate, tip: nTip, miles: nMiles };
     setLoops((prev) => [...prev, newLoop]);
     toast("Loop added");
 
-    // auto-create mileage expense
     if (settings.autoMileage && nMiles > 0 && settings.mileageRate > 0) {
       const amount = Number((nMiles * settings.mileageRate).toFixed(2));
       const existing = expensesBox.get<Expense[]>([]);
@@ -371,35 +394,25 @@ function Tips() {
 
 function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(() => settingsBox.get<Settings>(defaultSettings));
-
   useEffect(() => { settingsBox.set(settings); }, [settings]);
-
   const setNum = (k: keyof Settings, v: string) => {
-    const n = Number(v);
-    if (isNaN(n)) return;
+    const n = Number(v); if (isNaN(n)) return;
     setSettings((s) => ({ ...s, [k]: n } as Settings));
   };
 
   return (
     <div>
       <h2 style={{ marginBottom: 12 }}>Settings</h2>
-
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={row}>
           <label>
             Mileage rate ($/mi)
-            <input
-              style={{ ...input, marginLeft: 8, width: 120 }}
-              value={settings.mileageRate}
-              onChange={(e) => setNum("mileageRate", e.target.value)}
-            />
+            <input style={{ ...input, marginLeft: 8, width: 120 }} value={settings.mileageRate}
+              onChange={(e) => setNum("mileageRate", e.target.value)} />
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input
-              type="checkbox"
-              checked={settings.autoMileage}
-              onChange={(e) => setSettings((s) => ({ ...s, autoMileage: e.target.checked }))}
-            />
+            <input type="checkbox" checked={settings.autoMileage}
+              onChange={(e) => setSettings((s) => ({ ...s, autoMileage: e.target.checked }))} />
             Auto-create mileage expense on add loop
           </label>
         </div>
@@ -412,20 +425,12 @@ function SettingsPage() {
           <label style={{ ...btn, display: "inline-block" }}>
             Import backup…
             <input
-              type="file"
-              accept="application/json"
-              style={{ display: "none" }}
+              type="file" accept="application/json" style={{ display: "none" }}
               onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
+                const f = e.target.files?.[0]; if (!f) return;
                 const text = await f.text();
-                try {
-                  const parsed = JSON.parse(text);
-                  importAll(parsed);
-                  toast("Backup imported");
-                } catch {
-                  alert("Not a valid JSON backup file.");
-                }
+                try { importAll(JSON.parse(text)); toast("Backup imported"); }
+                catch { alert("Not a valid JSON backup file."); }
               }}
             />
           </label>
