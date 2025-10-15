@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   HashRouter,
   Routes,
@@ -17,6 +17,7 @@ const today = () => {
 };
 const makeId = () =>
   (crypto as any).randomUUID ? (crypto as any).randomUUID() : `${Date.now()}_${Math.random()}`;
+const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
 const box = (k: string) => ({
   get: <T,>(fallback: T) => {
@@ -31,16 +32,45 @@ const box = (k: string) => ({
 });
 
 /* ================= Types ================= */
-type Loop = { id: string; date: string; course: string; rate: number; tip: number; miles: number };
+type Loop = {
+  id: string;
+  date: string;
+  reportTime: string; // "HH:MM"
+  teeTime: string; // "HH:MM"
+  course: string;
+  courseLat?: number;
+  courseLng?: number;
+  bagFee: number;  // $
+  preGrat: number; // $
+  tip: number;     // $
+  miles: number;
+};
+
 type Expense = { id: string; date: string; type: string; amount: number };
 type Tip = { id: string; date: string; source: string; amount: number };
-type Settings = { mileageRate: number; autoMileage: boolean };
+
+type Settings = {
+  mileageRate: number;       // $/mi
+  autoMileage: boolean;      // create mileage expense on add loop
+  homeAddress: string;       // free text
+  homeLat?: number;          // set if chosen via Google
+  homeLng?: number;
+  googleApiKey?: string;     // optional; enables Places + distance auto-calc
+};
 
 const loopsBox = box("loops");
 const expensesBox = box("expenses");
 const tipsBox = box("tips");
 const settingsBox = box("settings");
-const defaultSettings: Settings = { mileageRate: 0.67, autoMileage: true };
+
+const defaultSettings: Settings = {
+  mileageRate: 0.67,
+  autoMileage: true,
+  homeAddress: "",
+  homeLat: undefined,
+  homeLng: undefined,
+  googleApiKey: "",
+};
 
 /* ================= Tiny toast ================= */
 type ToastItem = { id: number; msg: string };
@@ -61,7 +91,7 @@ function ToastHost() {
     const sub = () => setTick((x) => x + 1);
     listeners.add(sub);
     return () => {
-      listeners.delete(sub); // return void (TS-safe)
+      listeners.delete(sub);
     };
   }, []);
   return (
@@ -89,10 +119,12 @@ const main: React.CSSProperties = { flex: 1, width: "100%", padding: "16px 0" };
 const tabsBar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 10, borderBottom: "1px solid #e5e5e5", background: "#ffffff" };
 const tabActive: React.CSSProperties = { border: "1px solid #d0d0d0", fontWeight: 700, boxShadow: "0 1px 2px rgba(0,0,0,0.06)" };
 const card: React.CSSProperties = { border: "1px solid #eee", borderRadius: 12, padding: 12 };
-const row: React.CSSProperties = { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" };
+const fieldWrap: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 4, minWidth: 140 };
+const row: React.CSSProperties = { display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" };
 const btn: React.CSSProperties = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, background: "#fff", cursor: "pointer" };
 const input: React.CSSProperties = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8 };
-const smallNote: React.CSSProperties = { color: "#666", fontSize: 12 };
+const select: React.CSSProperties = { padding: "6px 10px", border: "1px solid #ddd", borderRadius: 8, background: "#fff" };
+const smallNote: React.CSSProperties = { color: "#666", fontSize: 12, lineHeight: 1.25 };
 
 /* ================= Tiny icons (inline SVG) ================= */
 function IconHome({ size = 18 }: { size?: number }) {
@@ -143,20 +175,14 @@ function NavTabs() {
     { to: "/tips", label: "Tips" },
     { to: "/settings", label: "Settings", icon: <IconGear /> },
   ];
-
+  const tabsBar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 10, borderBottom: "1px solid #e5e5e5", background: "#ffffff" };
+  const container: React.CSSProperties = { width: "100%", maxWidth: 960, margin: "0 auto", padding: "0 16px" };
   const tightTabs: React.CSSProperties = { display: "flex", gap: 6, padding: 6, flexWrap: "nowrap", overflowX: "auto" };
   const tightTabBase: React.CSSProperties = {
-    padding: "8px 10px",
-    borderRadius: 10,
-    textDecoration: "none",
-    color: "inherit",
-    border: "1px solid transparent",
-    fontWeight: 600,
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 8,
-    whiteSpace: "nowrap",
+    padding: "8px 10px", borderRadius: 10, textDecoration: "none", color: "inherit",
+    border: "1px solid transparent", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
   };
+  const tabActive: React.CSSProperties = { border: "1px solid #d0d0d0", fontWeight: 700, boxShadow: "0 1px 2px rgba(0,0,0,0.06)" };
 
   return (
     <div style={tabsBar}>
@@ -182,19 +208,71 @@ function NavTabs() {
   );
 }
 
+/* ================= Time utils ================= */
+function timeOptions(start = "04:00", end = "21:00", stepMin = 15) {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  const startMin = sh * 60 + sm;
+  const endMin = eh * 60 + em;
+  const res: { value: string; label: string }[] = [];
+  for (let m = startMin; m <= endMin; m += stepMin) {
+    const h = Math.floor(m / 60);
+    const mm = m % 60;
+    const value = `${pad(h)}:${pad(mm)}`;
+    const ampm = h >= 12 ? "PM" : "AM";
+    const hr12 = h % 12 === 0 ? 12 : h % 12;
+    const label = `${hr12}:${pad(mm)} ${ampm}`;
+    res.push({ value, label });
+  }
+  return res;
+}
+const REPORT_TIMES = timeOptions("04:00", "21:00", 15);
+const TEE_TIMES = timeOptions("04:00", "21:00", 15);
+
+/* ================= Distance helpers ================= */
+function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 3958.8; // miles
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const s =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(s));
+}
+
+/** Load Google Maps JS (Places) once, using settings.googleApiKey */
+async function loadGoogle(apiKey?: string): Promise<typeof window.google | undefined> {
+  if (typeof window === "undefined") return;
+  if ((window as any).google?.maps?.places) return (window as any).google;
+  if (!apiKey) return undefined; // no key, skip
+  if (document.getElementById("ggl-maps-js")) {
+    // script is loading; wait a bit
+    await new Promise((r) => setTimeout(r, 800));
+    return (window as any).google;
+  }
+  const s = document.createElement("script");
+  s.id = "ggl-maps-js";
+  s.async = true;
+  s.defer = true;
+  s.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places`;
+  document.head.appendChild(s);
+  await new Promise((r) => (s.onload = () => r(null)));
+  return (window as any).google;
+}
+
 /* ================= Pages ================= */
-// Home: remove big title/description and remove bottom nav buttons
+// Home stays minimal (totals only)
 function Home() {
   const loops = loopsBox.get<Loop[]>([]);
   const expenses = expensesBox.get<Expense[]>([]);
   const tips = tipsBox.get<Tip[]>([]);
-  const loopTotal = loops.reduce((s, x) => s + x.rate + x.tip, 0);
+  const loopTotal = loops.reduce((s, x) => s + x.bagFee + x.preGrat + x.tip, 0);
   const expensesTotal = expenses.reduce((s, x) => s + x.amount, 0);
   const tipsTotal = tips.reduce((s, x) => s + x.amount, 0);
 
   return (
     <div>
-      {/* Minimal overview only */}
       <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div style={card}><b>Loops total</b><div>${loopTotal.toFixed(2)}</div></div>
         <div style={card}><b>Expenses total</b><div>${expensesTotal.toFixed(2)}</div></div>
@@ -207,30 +285,116 @@ function Home() {
 function Loops() {
   const [loops, setLoops] = useState<Loop[]>(() => loopsBox.get<Loop[]>([]));
   const [date, setDate] = useState(today());
-  const [course, setCourse] = useState("Fields Ranch");
-  const [rate, setRate] = useState("110");
-  const [tip, setTip] = useState("60");
-  const [miles, setMiles] = useState("10");
+  const [reportTime, setReportTime] = useState("06:00");
+  const [teeTime, setTeeTime] = useState("07:00");
+
+  // Course & places
+  const [course, setCourse] = useState("");
+  const [courseLat, setCourseLat] = useState<number | undefined>(undefined);
+  const [courseLng, setCourseLng] = useState<number | undefined>(undefined);
+  const courseRef = useRef<HTMLInputElement | null>(null);
+
+  // Money fields default to $0
+  const [bagFee, setBagFee] = useState("0");
+  const [preGrat, setPreGrat] = useState("0");
+  const [tip, setTip] = useState("0");
+
+  // Miles (auto when we have coords; still editable)
+  const [miles, setMiles] = useState("0");
+
   const settings = settingsBox.get<Settings>(defaultSettings);
 
+  // Persist loops
   useEffect(() => { loopsBox.set(loops); }, [loops]);
+
+  // Initialize Google Autocomplete on the course input (if API key exists)
+  useEffect(() => {
+    let ac: google.maps.places.Autocomplete | undefined;
+    (async () => {
+      const g = await loadGoogle(settings.googleApiKey);
+      if (!g || !courseRef.current) return;
+      ac = new g.maps.places.Autocomplete(courseRef.current as HTMLInputElement, {
+        fields: ["name", "geometry"],
+        types: ["establishment"],
+      });
+      ac.addListener("place_changed", () => {
+        const place = ac!.getPlace();
+        const name = place?.name || courseRef.current!.value || "";
+        const lat = place?.geometry?.location?.lat?.();
+        const lng = place?.geometry?.location?.lng?.();
+        setCourse(name);
+        setCourseLat(lat);
+        setCourseLng(lng);
+      });
+    })();
+    return () => {};
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.googleApiKey]);
+
+  // Auto-calc miles when home + course have coords
+  useEffect(() => {
+    if (settings.homeLat && settings.homeLng && courseLat && courseLng) {
+      const dist = haversineMiles(
+        { lat: settings.homeLat, lng: settings.homeLng },
+        { lat: courseLat, lng: courseLng }
+      );
+      const val = (Math.round(dist * 10) / 10).toFixed(1);
+      setMiles(val);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.homeLat, settings.homeLng, courseLat, courseLng]);
 
   const add = () => {
     if (!course.trim()) return alert("Course required");
-    const nRate = Number(rate), nTip = Number(tip), nMiles = Number(miles);
-    if ([nRate, nTip, nMiles].some(isNaN)) return alert("Rate/Tip/Miles must be numbers");
 
-    const newLoop: Loop = { id: makeId(), date, course: course.trim(), rate: nRate, tip: nTip, miles: nMiles };
+    const nBag = Number(bagFee);
+    const nPre = Number(preGrat);
+    const nTip = Number(tip);
+    const nMiles = Number(miles);
+
+    if ([nBag, nPre, nTip, nMiles].some((x) => isNaN(x))) {
+      return alert("Bag Fee / Pre-Grat / Tip / Miles must be numbers");
+    }
+
+    const newLoop: Loop = {
+      id: makeId(),
+      date,
+      reportTime,
+      teeTime,
+      course: course.trim(),
+      courseLat,
+      courseLng,
+      bagFee: clamp(nBag, -1_000_000, 1_000_000),
+      preGrat: clamp(nPre, -1_000_000, 1_000_000),
+      tip: clamp(nTip, -1_000_000, 1_000_000),
+      miles: Math.max(0, nMiles),
+    };
+
     setLoops((prev) => [...prev, newLoop]);
     toast("Loop added");
 
-    if (settings.autoMileage && nMiles > 0 && settings.mileageRate > 0) {
-      const amount = Number((nMiles * settings.mileageRate).toFixed(2));
+    // Auto-create mileage expense
+    if (settings.autoMileage && newLoop.miles > 0 && settings.mileageRate > 0) {
+      const amount = Number((newLoop.miles * settings.mileageRate).toFixed(2));
       const existing = expensesBox.get<Expense[]>([]);
-      const newExp: Expense = { id: makeId(), date, type: `Mileage (${nMiles} mi @ $${settings.mileageRate}/mi)`, amount };
+      const newExp: Expense = {
+        id: makeId(),
+        date,
+        type: `Mileage (${newLoop.miles} mi @ $${settings.mileageRate}/mi)`,
+        amount,
+      };
       expensesBox.set([...existing, newExp]);
       toast("Mileage expense added");
     }
+
+    // Reset quick inputs
+    setCourse("");
+    setCourseLat(undefined);
+    setCourseLng(undefined);
+    setBagFee("0");
+    setPreGrat("0");
+    setTip("0");
+    // keep date/times as-is for convenience
   };
 
   const del = (id: string) => {
@@ -238,7 +402,7 @@ function Loops() {
     toast("Loop deleted");
   };
 
-  const total = useMemo(() => loops.reduce((s, x) => s + x.rate + x.tip, 0), [loops]);
+  const total$ = useMemo(() => loops.reduce((s, x) => s + x.bagFee + x.preGrat + x.tip, 0), [loops]);
   const totalMiles = useMemo(() => loops.reduce((s, x) => s + x.miles, 0), [loops]);
 
   return (
@@ -247,15 +411,65 @@ function Loops() {
 
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={row}>
-          <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <input style={input} placeholder="Course" value={course} onChange={(e) => setCourse(e.target.value)} />
-          <input style={input} placeholder="Rate" value={rate} onChange={(e) => setRate(e.target.value)} />
-          <input style={input} placeholder="Tip" value={tip} onChange={(e) => setTip(e.target.value)} />
-          <input style={input} placeholder="Miles" value={miles} onChange={(e) => setMiles(e.target.value)} />
-          <button style={btn} onClick={add}>Add Loop</button>
-        </div>
-        <div style={smallNote}>
-          Mileage rate: ${settings.mileageRate.toFixed(2)}/mi • Auto mileage: {settings.autoMileage ? "On" : "Off"} (change in Settings)
+          <div style={fieldWrap}>
+            <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div style={smallNote}>Date of loop</div>
+          </div>
+
+          <div style={fieldWrap}>
+            <select style={select} value={reportTime} onChange={(e) => setReportTime(e.target.value)}>
+              {REPORT_TIMES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <div style={smallNote}>Report Time (arrival)</div>
+          </div>
+
+          <div style={fieldWrap}>
+            <select style={select} value={teeTime} onChange={(e) => setTeeTime(e.target.value)}>
+              {TEE_TIMES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+            <div style={smallNote}>Tee Time</div>
+          </div>
+
+          <div style={{ ...fieldWrap, minWidth: 220, flex: "1 1 260px" }}>
+            <input
+              ref={courseRef}
+              style={input}
+              placeholder="Course (Google autocomplete if API key set)"
+              value={course}
+              onChange={(e) => setCourse(e.target.value)}
+            />
+            <div style={smallNote}>
+              Start typing a golf course name. If you add a Google Maps API key in Settings, this will auto-complete and we’ll auto-calculate miles from your Home Address.
+            </div>
+          </div>
+
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={bagFee} onChange={(e) => setBagFee(e.target.value)} />
+            <div style={smallNote}>Bag Fee ($)</div>
+          </div>
+
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={preGrat} onChange={(e) => setPreGrat(e.target.value)} />
+            <div style={smallNote}>Pre-Grat ($)</div>
+          </div>
+
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={tip} onChange={(e) => setTip(e.target.value)} />
+            <div style={smallNote}>Tip ($)</div>
+          </div>
+
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={miles} onChange={(e) => setMiles(e.target.value)} />
+            <div style={smallNote}>Miles (auto if Home + Course coords)</div>
+          </div>
+
+          <div style={{ alignSelf: "flex-end" }}>
+            <button style={btn} onClick={add}>Add Loop</button>
+          </div>
         </div>
       </div>
 
@@ -264,15 +478,19 @@ function Loops() {
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {loops.map((x) => (
-            <div key={x.id} style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div><b>{x.course}</b> • {x.date}</div>
-                <small>Rate ${x.rate} + Tip ${x.tip} • {x.miles} mi</small>
+            <div key={x.id} style={{ ...card, display: "grid", gap: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div>
+                  <div><b>{x.course || "(no course)"}</b> • {x.date} • Report {x.reportTime} • Tee {x.teeTime}</div>
+                  <small>
+                    Bag ${x.bagFee.toFixed(2)} • Pre-Grat ${x.preGrat.toFixed(2)} • Tip ${x.tip.toFixed(2)} • {x.miles} mi
+                  </small>
+                </div>
+                <button style={btn} onClick={() => del(x.id)}>Delete</button>
               </div>
-              <button style={btn} onClick={() => del(x.id)}>Delete</button>
             </div>
           ))}
-          <div style={{ ...card, fontWeight: 600 }}>Totals: ${total.toFixed(2)} • {totalMiles} mi</div>
+          <div style={{ ...card, fontWeight: 600 }}>Totals: ${total$.toFixed(2)} • {totalMiles.toFixed(1)} mi</div>
         </div>
       )}
     </div>
@@ -304,10 +522,21 @@ function Expenses() {
       <h2 style={{ marginBottom: 12 }}>Expenses</h2>
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={row}>
-          <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <input style={input} placeholder="Type" value={type} onChange={(e) => setType(e.target.value)} />
-          <input style={input} placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <button style={btn} onClick={add}>Add Expense</button>
+          <div style={fieldWrap}>
+            <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div style={smallNote}>Date</div>
+          </div>
+          <div style={fieldWrap}>
+            <input style={input} placeholder="Type" value={type} onChange={(e) => setType(e.target.value)} />
+            <div style={smallNote}>Category / label</div>
+          </div>
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <div style={smallNote}>Amount ($)</div>
+          </div>
+          <div style={{ alignSelf: "flex-end" }}>
+            <button style={btn} onClick={add}>Add Expense</button>
+          </div>
         </div>
       </div>
 
@@ -356,10 +585,21 @@ function Tips() {
       <h2 style={{ marginBottom: 12 }}>Tips</h2>
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={row}>
-          <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          <input style={input} placeholder="Source" value={source} onChange={(e) => setSource(e.target.value)} />
-          <input style={input} placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <button style={btn} onClick={add}>Add Tip</button>
+          <div style={fieldWrap}>
+            <input style={input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <div style={smallNote}>Date received</div>
+          </div>
+          <div style={fieldWrap}>
+            <input style={input} placeholder="Source" value={source} onChange={(e) => setSource(e.target.value)} />
+            <div style={smallNote}>Where the tip came from</div>
+          </div>
+          <div style={fieldWrap}>
+            <input style={input} inputMode="decimal" placeholder="0" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <div style={smallNote}>Amount ($)</div>
+          </div>
+          <div style={{ alignSelf: "flex-end" }}>
+            <button style={btn} onClick={add}>Add Tip</button>
+          </div>
         </div>
       </div>
 
@@ -386,14 +626,65 @@ function Tips() {
 function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(() => settingsBox.get<Settings>(defaultSettings));
   useEffect(() => { settingsBox.set(settings); }, [settings]);
+
   const setNum = (k: keyof Settings, v: string) => {
     const n = Number(v); if (isNaN(n)) return;
     setSettings((s) => ({ ...s, [k]: n } as Settings));
   };
 
+  // Home address Google Autocomplete (optional)
+  const homeRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    (async () => {
+      const g = await loadGoogle(settings.googleApiKey);
+      if (!g || !homeRef.current) return;
+      const ac = new g.maps.places.Autocomplete(homeRef.current as HTMLInputElement, {
+        fields: ["formatted_address", "geometry"],
+        types: ["address"],
+      });
+      ac.addListener("place_changed", () => {
+        const p = ac.getPlace();
+        const addr = (p?.formatted_address || homeRef.current!.value || "").toString();
+        const lat = p?.geometry?.location?.lat?.();
+        const lng = p?.geometry?.location?.lng?.();
+        setSettings((s) => ({ ...s, homeAddress: addr, homeLat: lat, homeLng: lng }));
+      });
+    })();
+  }, [settings.googleApiKey]);
+
   return (
     <div>
       <h2 style={{ marginBottom: 12 }}>Settings</h2>
+
+      <div style={{ ...card, marginBottom: 16 }}>
+        <div style={row}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 260, flex: "1 1 320px" }}>
+            <input
+              ref={homeRef}
+              style={input}
+              placeholder="Home Address (autocomplete if API key set)"
+              value={settings.homeAddress}
+              onChange={(e) => setSettings((s) => ({ ...s, homeAddress: e.target.value }))}
+            />
+            <div style={smallNote}>
+              Used to auto-calculate miles to the selected course. If you choose an address from Google, we’ll store coordinates for accurate distance.
+            </div>
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 220 }}>
+            <input
+              style={input}
+              placeholder="Google Maps API Key (optional)"
+              value={settings.googleApiKey || ""}
+              onChange={(e) => setSettings((s) => ({ ...s, googleApiKey: e.target.value.trim() }))}
+            />
+            <div style={smallNote}>
+              Enables course & address autocomplete and auto-miles. Leave blank to enter manually.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={row}>
           <label>
@@ -409,24 +700,31 @@ function SettingsPage() {
         </div>
       </div>
 
-      <div style={card}>
-        <b>Backup & Reset</b>
-        <div style={{ ...row, marginTop: 8 }}>
-          <button style={btn} onClick={exportAll}>Export backup (JSON)</button>
-          <label style={{ ...btn, display: "inline-block" }}>
-            Import backup…
-            <input
-              type="file" accept="application/json" style={{ display: "none" }}
-              onChange={async (e) => {
-                const f = e.target.files?.[0]; if (!f) return;
-                const text = await f.text();
-                try { importAll(JSON.parse(text)); toast("Backup imported"); }
-                catch { alert("Not a valid JSON backup file."); }
-              }}
-            />
-          </label>
-          <button style={btn} onClick={resetAll}>Reset all data</button>
-        </div>
+      <BackupCard />
+    </div>
+  );
+}
+
+/* ================= Backup UI ================= */
+function BackupCard() {
+  return (
+    <div style={card}>
+      <b>Backup & Reset</b>
+      <div style={{ ...row, marginTop: 8 }}>
+        <button style={btn} onClick={exportAll}>Export backup (JSON)</button>
+        <label style={{ ...btn, display: "inline-block" }}>
+          Import backup…
+          <input
+            type="file" accept="application/json" style={{ display: "none" }}
+            onChange={async (e) => {
+              const f = e.target.files?.[0]; if (!f) return;
+              const text = await f.text();
+              try { importAll(JSON.parse(text)); toast("Backup imported"); }
+              catch { alert("Not a valid JSON backup file."); }
+            }}
+          />
+        </label>
+        <button style={btn} onClick={resetAll}>Reset all data</button>
       </div>
     </div>
   );
