@@ -9,13 +9,13 @@ import {
   useLocation,
 } from "react-router-dom";
 
-/* global google */
+/* ---------------- Google Maps ambient types (TS-safe shim) ---------------- */
 declare global {
   interface Window {
-    google?: typeof google;
+    google?: any;
   }
 }
-
+declare const google: any;
 
 /* ================= Helpers & storage ================= */
 const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -53,17 +53,15 @@ type Loop = {
   tip: number;     // $
   miles: number;
 };
-
 type Expense = { id: string; date: string; type: string; amount: number };
 type Tip = { id: string; date: string; source: string; amount: number };
-
 type Settings = {
-  mileageRate: number;       // $/mi
-  autoMileage: boolean;      // create mileage expense on add loop
-  homeAddress: string;       // free text
-  homeLat?: number;          // set if chosen via Google
+  mileageRate: number;
+  autoMileage: boolean;
+  homeAddress: string;
+  homeLat?: number;
   homeLng?: number;
-  googleApiKey?: string;     // optional; enables Places + distance auto-calc
+  googleApiKey?: string;
 };
 
 const loopsBox = box("loops");
@@ -150,7 +148,7 @@ function IconGear({ size = 18 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path>
-      <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1A2 2 0 1 1 7.6 4l.1.1a1 1 0 0 0 1.1.2h.2A1 1 0 0 0 9.6 3V3a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9h.2a1 1 0 0 0 1.1-.2l.1-.1A2 2 0 1 1 20 7.6l-.1.1a1 1 0 0 0-.2 1.1v.2a1 1 0 0 0 .9.6H21a2 2 0 1 1 0 4h-.2a1 1 0 0 0-.9.6Z"></path>
+      <path d="M19.4 15a1 1 0 0 0 .2 1.1l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1 1 0 0 0-1.1-.2 1 1 0 0 0-.6.9V20a2 2 0 1 1-4 0v-.2a1 1 0 0 0-.6-.9 1 1 0 0 0-1.1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1 1 0 0 0 .2-1.1 1 1 0 0 0-.9-.6H4a2 2 0 1 1 0-4h.2a1 1 0 0 0 .9-.6 1 1 0 0 0-.2-1.1l-.1-.1A2 2 0 1 1 7.6 4l.1.1a1 1 0 0 0 1.1.2h.2A1 1 0 0 0 9.6 3V3a2 2 0 1 1 4 0v.2a1 1 0 0 0 .6.9h.2a1 1 0 0 0 1.1-.2l.1-.1A2 2 0 1 1 20 7.6l-.1.1a1 1 0 0 0-.2 1.1v.2a1 1 0 0 0 .9.6Z"></path>
     </svg>
   );
 }
@@ -183,14 +181,11 @@ function NavTabs() {
     { to: "/tips", label: "Tips" },
     { to: "/settings", label: "Settings", icon: <IconGear /> },
   ];
-  const tabsBar: React.CSSProperties = { position: "sticky", top: 0, zIndex: 10, borderBottom: "1px solid #e5e5e5", background: "#ffffff" };
-  const container: React.CSSProperties = { width: "100%", maxWidth: 960, margin: "0 auto", padding: "0 16px" };
   const tightTabs: React.CSSProperties = { display: "flex", gap: 6, padding: 6, flexWrap: "nowrap", overflowX: "auto" };
   const tightTabBase: React.CSSProperties = {
     padding: "8px 10px", borderRadius: 10, textDecoration: "none", color: "inherit",
     border: "1px solid transparent", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 8, whiteSpace: "nowrap",
   };
-  const tabActive: React.CSSProperties = { border: "1px solid #d0d0d0", fontWeight: 700, boxShadow: "0 1px 2px rgba(0,0,0,0.06)" };
 
   return (
     <div style={tabsBar}>
@@ -237,7 +232,7 @@ function timeOptions(start = "04:00", end = "21:00", stepMin = 15) {
 const REPORT_TIMES = timeOptions("04:00", "21:00", 15);
 const TEE_TIMES = timeOptions("04:00", "21:00", 15);
 
-/* ================= Distance helpers ================= */
+/* ================= Distance helpers & Google loader ================= */
 function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
   const R = 3958.8; // miles
   const toRad = (x: number) => (x * Math.PI) / 180;
@@ -249,13 +244,12 @@ function haversineMiles(a: { lat: number; lng: number }, b: { lat: number; lng: 
   return R * 2 * Math.asin(Math.sqrt(s));
 }
 
-/** Load Google Maps JS (Places) once, using settings.googleApiKey */
-async function loadGoogle(apiKey?: string): Promise<typeof window.google | undefined> {
+/** Load Google Maps JS (Places) once (return `any` so TS won't choke in CI) */
+async function loadGoogle(apiKey?: string): Promise<any | undefined> {
   if (typeof window === "undefined") return;
   if ((window as any).google?.maps?.places) return (window as any).google;
   if (!apiKey) return undefined; // no key, skip
   if (document.getElementById("ggl-maps-js")) {
-    // script is loading; wait a bit
     await new Promise((r) => setTimeout(r, 800));
     return (window as any).google;
   }
@@ -270,7 +264,7 @@ async function loadGoogle(apiKey?: string): Promise<typeof window.google | undef
 }
 
 /* ================= Pages ================= */
-// Home stays minimal (totals only)
+// Home: minimal totals only (no hero title or description)
 function Home() {
   const loops = loopsBox.get<Loop[]>([]);
   const expenses = expensesBox.get<Expense[]>([]);
@@ -307,7 +301,7 @@ function Loops() {
   const [preGrat, setPreGrat] = useState("0");
   const [tip, setTip] = useState("0");
 
-  // Miles (auto when we have coords; still editable)
+  // Miles (auto when coords available; still editable)
   const [miles, setMiles] = useState("0");
 
   const settings = settingsBox.get<Settings>(defaultSettings);
@@ -317,7 +311,7 @@ function Loops() {
 
   // Initialize Google Autocomplete on the course input (if API key exists)
   useEffect(() => {
-    let ac: google.maps.places.Autocomplete | undefined;
+    let ac: any | undefined;
     (async () => {
       const g = await loadGoogle(settings.googleApiKey);
       if (!g || !courseRef.current) return;
@@ -336,7 +330,6 @@ function Loops() {
       });
     })();
     return () => {};
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.googleApiKey]);
 
   // Auto-calc miles when home + course have coords
@@ -349,7 +342,6 @@ function Loops() {
       const val = (Math.round(dist * 10) / 10).toFixed(1);
       setMiles(val);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.homeLat, settings.homeLng, courseLat, courseLng]);
 
   const add = () => {
@@ -402,7 +394,7 @@ function Loops() {
     setBagFee("0");
     setPreGrat("0");
     setTip("0");
-    // keep date/times as-is for convenience
+    // keep date/times as-is
   };
 
   const del = (id: string) => {
@@ -451,7 +443,7 @@ function Loops() {
               onChange={(e) => setCourse(e.target.value)}
             />
             <div style={smallNote}>
-              Start typing a golf course name. If you add a Google Maps API key in Settings, this will auto-complete and we’ll auto-calculate miles from your Home Address.
+              Start typing a golf course. With a Google Maps API key in Settings, this auto-completes and we auto-calculate miles from your Home Address.
             </div>
           </div>
 
@@ -675,7 +667,7 @@ function SettingsPage() {
               onChange={(e) => setSettings((s) => ({ ...s, homeAddress: e.target.value }))}
             />
             <div style={smallNote}>
-              Used to auto-calculate miles to the selected course. If you choose an address from Google, we’ll store coordinates for accurate distance.
+              Used to auto-calculate miles to the selected course. Pick from Google to save exact coordinates.
             </div>
           </div>
 
@@ -805,3 +797,4 @@ function resetAll() {
   localStorage.removeItem("settings");
   location.reload();
 }
+
