@@ -47,7 +47,9 @@ function ToastHost() {
   useEffect(() => {
     const sub = () => setTick((x) => x + 1);
     listeners.add(sub);
-    return () => listeners.delete(sub);
+    return () => {
+      listeners.delete(sub);
+    };
   }, []);
   return (
     <div style={{ position: "fixed", bottom: 16, left: "50%", transform: "translateX(-50%)", zIndex: 9999 }}>
@@ -135,7 +137,7 @@ function NavTabs() {
   );
 }
 
-/* ========== pages ========== */
+/* ========== Home page ========== */
 function Home() {
   const navigate = useNavigate();
   return (
@@ -151,6 +153,7 @@ function Home() {
   );
 }
 
+/* ========== other pages (Loops, Expenses, Tips) ========== */
 type Loop = { id: string; date: string; course: string; rate: number; tip: number };
 type Expense = { id: string; date: string; type: string; amount: number };
 type Tip = { id: string; date: string; source: string; amount: number };
@@ -317,7 +320,7 @@ function Tips() {
   );
 }
 
-/* ========== backup / restore / reset (optional) ========== */
+/* ========== backup/reset helpers ========== */
 function download(filename: string, text: string, type = "application/json") {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type }));
@@ -349,7 +352,7 @@ function resetAll() {
   location.reload();
 }
 
-/* ========== app (HashRouter) ========== */
+/* ========== main App ========== */
 export default function App() {
   return (
     <HashRouter>
@@ -379,21 +382,4 @@ export default function App() {
                   accept="application/json"
                   style={{ display: "none" }}
                   onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    const text = await f.text();
-                    try { importAll(JSON.parse(text)); } catch { alert("Not a valid JSON backup file."); }
-                  }}
-                />
-              </label>
-              <button style={btn} onClick={resetAll}>Reset all data</button>
-            </div>
-          </div>
-        </footer>
-
-        <HomeFab />
-        <ToastHost />
-      </div>
-    </HashRouter>
-  );
-}
+                    const f = e.target.files?.[0
