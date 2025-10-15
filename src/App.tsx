@@ -183,8 +183,8 @@ function NavTabs() {
 }
 
 /* ================= Pages ================= */
+// Home: remove big title/description and remove bottom nav buttons
 function Home() {
-  const navigate = useNavigate();
   const loops = loopsBox.get<Loop[]>([]);
   const expenses = expensesBox.get<Expense[]>([]);
   const tips = tipsBox.get<Tip[]>([]);
@@ -194,20 +194,11 @@ function Home() {
 
   return (
     <div>
-      <h1 style={{ margin: "8px 0 12px", fontSize: 42, lineHeight: 1.1 }}>Loop Ledger</h1>
-      <p style={{ marginBottom: 16 }}>Use the tabs to track your loops, expenses, tips, and mileage.</p>
-
-      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 16 }}>
+      {/* Minimal overview only */}
+      <div style={{ display: "grid", gap: 12, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div style={card}><b>Loops total</b><div>${loopTotal.toFixed(2)}</div></div>
         <div style={card}><b>Expenses total</b><div>${expensesTotal.toFixed(2)}</div></div>
         <div style={card}><b>Tips total</b><div>${tipsTotal.toFixed(2)}</div></div>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <button style={btn} onClick={() => navigate("/loops")}>Go to Loops</button>
-        <button style={btn} onClick={() => navigate("/expenses")}>Go to Expenses</button>
-        <button style={btn} onClick={() => navigate("/tips")}>Go to Tips</button>
-        <button style={btn} onClick={() => navigate("/settings")}>Settings</button>
       </div>
     </div>
   );
