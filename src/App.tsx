@@ -8,6 +8,12 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
+import { createClient } from "@supabase/supabase-js";
+
+/* ---------------- Supabase client ---------------- */
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+export const supabase = createClient(supabaseUrl, supabaseAnon);
 
 /* ---------------- Google Maps ambient types (TS-safe shim) ---------------- */
 declare global {
@@ -261,6 +267,77 @@ async function loadGoogle(apiKey?: string): Promise<any | undefined> {
   document.head.appendChild(s);
   await new Promise((r) => (s.onload = () => r(null)));
   return (window as any).google;
+}
+
+/* ================= Auth Gate (Phase A) ================= */
+function SignInCard() {
+  const [email, setEmail] = useState("");
+
+  const sendLink = async () => {
+    if (!email.trim()) return alert("Enter your email");
+    // Use site origin for redirect (works for GitHub Pages + localhost)
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: redirectTo },
+    });
+    if (error) {
+      alert(error.message);
+    } else {
+      toast("Check your email for the login link");
+    }
+  };
+
+  return (
+    <div style={{ ...container, paddingTop: 48 }}>
+      <div style={{ ...card, maxWidth: 420, margin: "0 auto" }}>
+        <h2>Sign in</h2>
+        <div style={{ display: "grid", gap: 8 }}>
+          <input
+            style={input}
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <button style={btn} onClick={sendLink}>Send magic link</button>
+          <div style={smallNote}>
+            You’ll receive a one-time link to sign in. Keep this page open; it will detect the session when you return.
+          </div>
+        </div>
+      </div>
+      <ToastHost />
+    </div>
+  );
+}
+
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const [loading, setLoading] = useState(true);
+  const [hasSession, setHasSession] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setHasSession(!!data.session);
+      setLoading(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setHasSession(!!session);
+    });
+    return () => { sub.subscription.unsubscribe(); mounted = false; };
+  }, []);
+
+  if (loading) {
+    return (
+      <div style={{ ...container, paddingTop: 48 }}>
+        <div style={{ ...card, maxWidth: 420, margin: "0 auto", textAlign: "center" }}>Loading…</div>
+      </div>
+    );
+  }
+  if (!hasSession) return <SignInCard />;
+
+  return <>{children}</>;
 }
 
 /* ================= Pages ================= */
@@ -652,6 +729,11 @@ function SettingsPage() {
     })();
   }, [settings.googleApiKey]);
 
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    toast("Signed out");
+  };
+
   return (
     <div>
       <h2 style={{ marginBottom: 12 }}>Settings</h2>
@@ -700,6 +782,11 @@ function SettingsPage() {
         </div>
       </div>
 
+      <div style={{ ...card, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div><b>Account</b></div>
+        <button style={btn} onClick={signOut}>Sign out</button>
+      </div>
+
       <BackupCard />
     </div>
   );
@@ -731,7 +818,7 @@ function BackupCard() {
 }
 
 /* ================= App ================= */
-export default function App() {
+function AppShell() {
   return (
     <HashRouter>
       <div style={page}>
@@ -760,6 +847,14 @@ export default function App() {
         <ToastHost />
       </div>
     </HashRouter>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthGate>
+      <AppShell />
+    </AuthGate>
   );
 }
 
@@ -797,4 +892,3 @@ function resetAll() {
   localStorage.removeItem("settings");
   location.reload();
 }
-
