@@ -8,9 +8,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm test -- --run
+
+      # Install deps; prefer ci if lockfile exists, otherwise install
+      - name: Install dependencies
+        run: |
+          node -v
+          npm -v
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      # Run tests once (no watch)
+      - name: Run tests
+        run: npm test -- --run
