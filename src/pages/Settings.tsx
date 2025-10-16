@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { storage, Settings as SettingsType } from '../lib/storage';
-import { Card } from '../ui/Card';
+import { Card } from '../ui/card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { flags } from '../lib/flags';
