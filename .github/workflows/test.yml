@@ -12,5 +12,5 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npm test -- --run
+      - run: npm install --no-fund --no-audit
+      - run: npx vitest --run
