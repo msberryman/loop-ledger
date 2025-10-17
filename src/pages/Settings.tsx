@@ -32,6 +32,34 @@ Auto-calculate mileage on Add Loop
 </label>
 <div>
 <Button onClick={save}>Save</Button>
+<button
+  onClick={() => {
+    const payload = {
+      loops: JSON.parse(localStorage.getItem('loops') || '[]'),
+      expenses: JSON.parse(localStorage.getItem('expenses') || '[]'),
+      tips: JSON.parse(localStorage.getItem('tips') || '[]'),
+      settings: JSON.parse(localStorage.getItem('settings') || '{}'),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `loop-ledger-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }}
+  style={{
+    marginTop: '1rem',
+    padding: '0.5rem 1rem',
+    borderRadius: '6px',
+    background: '#2563eb',
+    color: 'white',
+    border: 'none',
+    cursor: 'pointer'
+  }}
+>
+  Export All Data
+</button>
 </div>
 </div>
 </Card>
