@@ -4,7 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import HomePage from './pages/Home';
 import LoopsPage from './pages/Loops';
 import ExpensesPage from './pages/Expenses';
-import TipsPage from './pages/Tips';
+import IncomePage from './pages/Income';
 import SettingsPage from './pages/Settings';
 
 
@@ -17,7 +17,7 @@ return (
 <Route path="/home" element={<HomePage />} />
 <Route path="/loops" element={<LoopsPage />} />
 <Route path="/expenses" element={<ExpensesPage />} />
-<Route path="/tips" element={<TipsPage />} />
+<Route path="/income" element={<IncomePage />} />
 <Route path="/settings" element={<SettingsPage />} />
 <Route path="*" element={<Navigate to="/home" replace />} />
 </Routes>

@@ -1,7 +1,6 @@
-// src/pages/Income.tsx
 import React, { useState } from 'react';
 import { storage, Income as IncomeEntry } from '../lib/storage';
-import { Card } from '../ui/card';            // use '../ui/Card' if your file is capitalized
+import { Card } from '../ui/card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
 

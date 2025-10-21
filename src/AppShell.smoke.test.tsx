@@ -17,23 +17,26 @@ beforeEach(() => localStorage.clear());
 describe('Base UI contract', () => {
   it('renders all 5 nav links and navigates', async () => {
     const { unmount } = renderApp('/home');
-    const tabs = ['Home', 'Loops', 'Expenses', 'Tips', 'Settings'] as const;
+    const tabs = ['Home', 'Loops', 'Expenses', 'Income', 'Settings'] as const;
 
     for (const t of tabs) {
       expect(await screen.findByRole('link', { name: t })).toBeInTheDocument();
     }
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole('link', { name: 'Loops' }));
-    expect(await screen.findByRole('heading', { name: 'Loops' })).toBeInTheDocument();
 
+    // Go to Loops and verify by a page-specific control (no page heading anymore)
+    await user.click(screen.getByRole('link', { name: 'Loops' }));
+    expect(await screen.findByLabelText(/course/i)).toBeInTheDocument();
+
+    // Go to Settings and verify by a page-specific control
     await user.click(screen.getByRole('link', { name: 'Settings' }));
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByLabelText(/home address/i)).toBeInTheDocument();
 
     unmount();
   });
 
-  it('persists loops/expenses/tips/settings', async () => {
+  it('persists loops/expenses/income/settings', async () => {
     const user = userEvent.setup();
     let app = renderApp('/loops');
 
@@ -51,11 +54,11 @@ describe('Base UI contract', () => {
     await user.type(screen.getByLabelText(/^amount/i), '12.34');
     await user.click(screen.getByRole('button', { name: /add expense/i }));
 
-    // Tips
-    await user.click(screen.getByRole('link', { name: 'Tips' }));
+    // Income (was Tips)
+    await user.click(screen.getByRole('link', { name: 'Income' }));
     await user.type(screen.getByLabelText(/date/i), '2025-10-15');
     await user.type(screen.getByLabelText(/^amount/i), '40');
-    await user.click(screen.getByRole('button', { name: /add tip/i }));
+    await user.click(screen.getByRole('button', { name: /add income/i }));
 
     // Settings
     await user.click(screen.getByRole('link', { name: 'Settings' }));
@@ -74,7 +77,7 @@ describe('Base UI contract', () => {
     await user.click(screen.getByRole('link', { name: 'Expenses' }));
     expect(await screen.findByText(/\$12\.34/)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('link', { name: 'Tips' }));
+    await user.click(screen.getByRole('link', { name: 'Income' }));
     expect(await screen.findByText(/\$40\.00/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Settings' }));
