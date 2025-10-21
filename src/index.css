@@ -6,4 +6,80 @@ html, body, #root {
   color: #111111;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
 }
+/* ----- Home (mobile-first) ----- */
+.home-wrap {
+  display: grid;
+  gap: 16px;
+}
+
+.home-title {
+  margin: 0;
+  font-size: 1.125rem; /* a hair smaller on mobile */
+}
+
+.home-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.home-actions-inner {
+  display: grid;
+  gap: 8px;            /* stack with small gap by default */
+  width: 100%;
+  max-width: 420px;    /* keeps full-width buttons from getting too wide */
+}
+
+.home-actions-inner > button {
+  width: 100%;
+  padding: 12px 16px;  /* comfortable tap size */
+  font-size: 1rem;
+}
+
+.stat-grid-wrap {
+  display: flex;
+  justify-content: center;
+}
+
+.stat-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;      /* 1 column on small screens */
+  width: 100%;
+  max-width: 780px;
+}
+
+.stat-box {
+  border: 1px solid var(--ll-border, #232931);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-label {
+  opacity: 0.8;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+}
+
+/* scale value a bit smaller on tiny screens so it doesn’t wrap awkwardly */
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+/* ----- Breakpoints ----- */
+@media (min-width: 480px) {
+  .home-actions-inner {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* buttons side by side */
+    gap: 12px;
+  }
+}
+
+@media (min-width: 640px) {
+  .stat-grid {
+    grid-template-columns: repeat(3, minmax(220px, 1fr)); /* 3 columns if room */
+    gap: 16px;
+  }
+  .stat-value { font-size: 1.75rem; }
+}
 

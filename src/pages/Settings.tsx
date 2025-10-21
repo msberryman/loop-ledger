@@ -1,76 +1,88 @@
 import React, { useState } from 'react';
-import { storage, Settings as SettingsType } from '../lib/storage';
+import { storage, Settings as SettingsModel } from '../lib/storage';
 import { Card } from '../ui/card';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
-import { flags } from '../lib/flags';
-
 
 export default function SettingsPage() {
-const [s, setS] = useState<SettingsType>(storage.getSettings());
+  // Load persisted settings (with safe defaults)
+  const initial = storage.getSettings
+    ? storage.getSettings()
+    : ({ homeAddress: '', mileageRate: 0.67, autoMileage: false } as SettingsModel);
 
+  const [homeAddress, setHomeAddress] = useState(initial.homeAddress ?? '');
+  const [mileageRate, setMileageRate] = useState(
+    typeof initial.mileageRate === 'number' && !Number.isNaN(initial.mileageRate)
+      ? initial.mileageRate
+      : 0.67
+  );
+  const [autoMileage, setAutoMileage] = useState(!!initial.autoMileage);
 
-const save = () => storage.setSettings(s);
+  const save = () => {
+    const next: SettingsModel = {
+      homeAddress: homeAddress.trim(),
+      mileageRate: Number.isFinite(mileageRate) ? mileageRate : 0.67,
+      autoMileage,
+    };
+    storage.setSettings(next);
+    // (Optional) add a tiny visual acknowledgement; keeping it minimal here.
+  };
 
-
-return (
-<>
-<h1>Settings</h1>
-<Card>
-<div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-<Input label="Home address"
-placeholder="123 Main St, City, ST"
-value={s.homeAddress}
-onChange={e => setS({ ...s, homeAddress: e.target.value })} />
-<Input label="Mileage rate ($/mile)"
-type="number" step="0.01"
-value={s.mileageRate}
-onChange={e => setS({ ...s, mileageRate: parseFloat(e.target.value || '0') })} />
-<label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-<input type="checkbox" checked={s.autoMileage} onChange={e => setS({ ...s, autoMileage: e.target.checked })} />
-Auto-calculate mileage on Add Loop
-</label>
-<div>
-<Button onClick={save}>Save</Button>
-<button
-  onClick={() => {
+  // Optional: Export All Data (loops, expenses, income/tips, settings)
+  const exportAll = () => {
     const payload = {
-      loops: JSON.parse(localStorage.getItem('loops') || '[]'),
-      expenses: JSON.parse(localStorage.getItem('expenses') || '[]'),
-      tips: JSON.parse(localStorage.getItem('tips') || '[]'),
-      settings: JSON.parse(localStorage.getItem('settings') || '{}'),
+      loops: storage.getLoops ? storage.getLoops() : [],
+      expenses: storage.getExpenses ? storage.getExpenses() : [],
+      // use income if available, else tips for back-compat
+      income: typeof storage.getIncome === 'function' ? storage.getIncome() : storage.getTips?.() ?? [],
+      settings: storage.getSettings ? storage.getSettings() : initial,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `loop-ledger-backup-${new Date().toISOString().slice(0,10)}.json`;
+    a.download = `loop-ledger-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
-  }}
-  style={{
-    marginTop: '1rem',
-    padding: '0.5rem 1rem',
-    borderRadius: '6px',
-    background: '#2563eb',
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer'
-  }}
->
-  Export All Data
-</button>
-</div>
-</div>
-</Card>
+  };
 
+  return (
+    <>
+      {/* Icon-only heading (accessible via aria-label inside PageHeading) */}
 
-{flags.MAPS_AUTOCOMPLETE ? (
-<Card className="mt-4" >
-<strong>Maps Autocomplete (flagged)</strong>
-<p style={{ opacity: 0.8 }}>UI placeholder — wire actual Google Places here without touching Settings contract.</p>
-</Card>
-) : null}
-</>
-);
+      <Card>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <Input
+            label="Home address"
+            value={homeAddress}
+            onChange={e => setHomeAddress(e.target.value)}
+            placeholder="123 Main St, City, ST"
+          />
+
+          <Input
+            label="Mileage rate"
+            type="number"
+            step="0.01"
+            value={String(mileageRate)}
+            onChange={e => setMileageRate(parseFloat(e.target.value))}
+          />
+
+          {/* Auto-mileage toggle (simple checkbox) */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, alignSelf: 'end' }}>
+            <input
+              type="checkbox"
+              checked={autoMileage}
+              onChange={e => setAutoMileage(e.target.checked)}
+            />
+            Auto-mileage
+          </label>
+
+          <div style={{ alignSelf: 'end', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button onClick={save}>Save</Button>
+            <Button variant="ghost" onClick={exportAll}>Export All Data</Button>
+          </div>
+        </div>
+      </Card>
+    </>
+  );
 }

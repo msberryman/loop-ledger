@@ -1,16 +1,29 @@
-import React from "react";
-import { Link } from "react-router-dom";
+// src/ui/Home.tsx
+import React from 'react';
+import { tokens } from './tokens';
 
-export default function Home() {
+type Props = React.PropsWithChildren<{
+  className?: string;
+  style?: React.CSSProperties;
+}>;
+
+/**
+ * HomeSection — lightweight UI wrapper for Home page bits.
+ * Safe to keep even if unused. Provides both named and default export.
+ */
+export const HomeSection: React.FC<Props> = ({ children, className, style }) => {
   return (
-    <div className="screen">
-      <h2>Home</h2>
-
-      <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-        <Link className="big-button" to="/loops">New Loop</Link>
-        <Link className="big-button" to="/expenses">Expenses</Link>
-        <Link className="big-button" to="/ui/history">History</Link>
-      </div>
-    </div>
+    <section
+      className={className}
+      style={{
+        display: 'grid',
+        gap: tokens.spacing.lg,
+        ...style,
+      }}
+    >
+      {children}
+    </section>
   );
-}
+};
+
+export default HomeSection;
