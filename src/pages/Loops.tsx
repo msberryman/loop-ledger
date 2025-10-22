@@ -207,8 +207,11 @@ export default function LoopsPage() {
 
           {/* Course (Google Places Autocomplete if available) */}
           <div>
-            <label style={{ display: 'block', marginBottom: 4 }}>Course</label>
+            <label htmlFor="course" style={{ display: 'block', marginBottom: 4 }}>Course</label>
             <input
+              id="course"
+              name="course"
+              aria-label="Course"
               ref={courseRef}
               value={course}
               onChange={e => setCourse(e.target.value)}
@@ -537,5 +540,3 @@ function Field(props: {
     </div>
   );
 }
-
-
