@@ -1,78 +1,90 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+// src/pages/Home.tsx
+import React, { useMemo } from 'react';
 import { storage } from '../lib/storage';
-import { tokens } from '../ui/tokens';
+import { Card } from '../ui/card';
 import { Button } from '../ui/Button';
 
-// money/date helpers
 const fmtMoney = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
-const toDate = (s: string) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+
+function toDate(s: string) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
-};
-const isInCurrentMonth = (d: Date) => {
+}
+function isInCurrentMonth(d: Date) {
   const now = new Date();
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-};
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="stat-box" style={{ borderColor: tokens.color.border, borderRadius: tokens.radius.lg }}>
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-    </div>
-  );
+}
+// robust numeric coerce for old + new records
+function toNum(v: unknown) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
-export default function HomePage() {
-  const navigate = useNavigate();
+export default function Home() {
+  // Pull from storage every render; if you want live reactive, lift to state and update on writes.
+  const loops = (storage.getLoops?.() ?? []) as Array<{
+    id: string;
+    date?: string;
+    bagFee?: number | string;
+    tip?: number | string;
+    pregrat?: number | string;
+  }>;
 
-  // Pull data
-  const loops = storage.getLoops();
-  const income = storage.getIncome ? storage.getIncome() : storage.getTips(); // back-compat if you haven't refactored yet
-  const expenses = storage.getExpenses();
+  const expenses = (storage.getExpenses?.() ?? []) as Array<{
+    id: string;
+    date?: string;
+    amount?: number | string;
+  }>;
 
-  // Month-to-date
-  const mtdLoops = loops.filter(l => isInCurrentMonth(toDate(l.date)));
-  const mtdIncome = income.filter((i: any) => isInCurrentMonth(toDate(i.date)));
-  const mtdExpenses = expenses.filter(e => isInCurrentMonth(toDate(e.date)));
+  const { totalLoops, totalCashMTD, totalExpensesMTD } = useMemo(() => {
+    const loopsMTD = loops.filter(l => l.date && isInCurrentMonth(toDate(l.date!)));
+    const totalLoops = loopsMTD.length;
 
-  // Totals
-  const totalLoops = mtdLoops.length;
+    const totalCashMTD = loopsMTD.reduce((sum, l) => {
+      // New model: bagFee + tip + pregrat; coerce old string values too
+      return sum + toNum(l.bagFee) + toNum(l.tip) + toNum(l.pregrat);
+    }, 0);
 
-  // Total Cash = income + optional loop monetary fields
-  const loopCash = mtdLoops.reduce((sum, l: any) => {
-    const fee = typeof l.fee === 'number' ? l.fee : 0;
-    const pre = typeof l.pregrat === 'number' ? l.pregrat : 0;
-    const tip = typeof l.tip === 'number' ? l.tip : 0;
-    return sum + fee + pre + tip;
-  }, 0);
-  const incomeCash = mtdIncome.reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
-  const totalCash = loopCash + incomeCash;
+    const expensesMTD = expenses.filter(e => e.date && isInCurrentMonth(toDate(e.date!)));
+    const totalExpensesMTD = expensesMTD.reduce((sum, e) => sum + toNum(e.amount), 0);
 
-  const totalExpenses = mtdExpenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    return { totalLoops, totalCashMTD, totalExpensesMTD };
+  }, [loops, expenses]);
 
+  // ---- UI (keep your existing header/nav; this is just the body) ----
   return (
-    <div className="home-wrap">
-      {/* Icon-only page heading, still accessible via aria-label inside PageHeading */}
-
-      {/* Centered primary actions */}
-      <div className="home-actions">
-        <div className="home-actions-inner">
-          <Button onClick={() => navigate('/loops')}>Add Loop</Button>
-          <Button onClick={() => navigate('/expenses')} variant="ghost">Add Expense</Button>
-        </div>
+    <>
+      {/* Your two top buttons */}
+      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+        <Button onClick={() => (window.location.href = '/loops')}>Add Loop</Button>
+        <Button variant="ghost" onClick={() => (window.location.href = '/expenses')}>Add Expense</Button>
       </div>
 
-      {/* Month-to-Date stats, centered */}
-      <div className="stat-grid-wrap">
-        <div className="stat-grid">
-          <Stat label="Total Loops (MTD)" value={String(totalLoops)} />
-          <Stat label="Total Cash (MTD)" value={fmtMoney.format(totalCash)} />
-          <Stat label="Total Expenses (MTD)" value={fmtMoney.format(totalExpenses)} />
-        </div>
+      {/* Stats */}
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 12 }}>
+        <Card>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ opacity: 0.85, marginBottom: 8 }}>Total Loops (MTD)</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{totalLoops}</div>
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ opacity: 0.85, marginBottom: 8 }}>Total Cash (MTD)</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{fmtMoney.format(totalCashMTD)}</div>
+          </div>
+        </Card>
+
+        <Card>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ opacity: 0.85, marginBottom: 8 }}>Total Expenses (MTD)</div>
+            <div style={{ fontSize: 28, fontWeight: 800 }}>{fmtMoney.format(totalExpensesMTD)}</div>
+          </div>
+        </Card>
       </div>
-    </div>
+    </>
   );
 }
-
