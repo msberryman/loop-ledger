@@ -59,7 +59,7 @@ export default function Home() {
       {/* Your two top buttons */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
         <Button onClick={() => (window.location.href = '/loops')}>Add Loop</Button>
-        <Button variant="ghost" onClick={() => (window.location.href = '/expenses')}>Add Expense</Button>
+        <Button variant="ghost" onClick={() => (window.location.href = '/expenses?mode=add')}>Add Expense</Button>
       </div>
 
       {/* Stats */}
