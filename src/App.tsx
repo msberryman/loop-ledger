@@ -1,12 +1,13 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { HashRouter } from 'react-router-dom';
 import AppShell from './AppShell';
 
 export default function App() {
-  // Vite sets BASE_URL; in dev it's "/" and in prod it's "/loop-ledger/"
+  // HashRouter works reliably on GitHub Pages (no server-side routes needed)
   return (
-    <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <HashRouter>
       <AppShell />
-    </BrowserRouter>
+    </HashRouter>
   );
 }
+
