@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script>
+      // Redirect all GitHub Pages 404s to the SPA entry, preserving the path.
+      (function () {
+        var base = '/loop-ledger/'; // repo name (production base)
+        var l = window.location;
+        // If site is served at a different base (forks), fall back to root.
+        if (!l.pathname.startsWith(base)) base = '/';
+        var newUrl = base + '#' + l.pathname.substring(base.length) + l.search + l.hash;
+        l.replace(newUrl);
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>
