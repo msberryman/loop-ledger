@@ -1,7 +1,7 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: "./", // relative paths so it works at /<repo>/ on Pages
-});
+  base: mode === 'production' ? '/loop-ledger/' : '/', // dev=/, prod=/loop-ledger/
+}));
